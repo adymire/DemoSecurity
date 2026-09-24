@@ -1,0 +1,8 @@
+// MongoDB uses the Mongoose adapter and the same domain contract as the SQL schemas.
+// This file documents the collection shape for migrations and code generation.
+{
+  "users": { "_id": "ObjectId", "email": "unique string", "status": "ACTIVE|RESTRICTED|TEMPORARY_BLOCK|PERMANENT_BLOCK", "onboarding": "object", "subscription": "object", "createdAt": "date" },
+  "identities": { "userId": "ObjectId", "provider": "GOOGLE|GITHUB", "providerUserId": "string", "unique": ["provider", "providerUserId"] },
+  "riskSignals": { "userId": "ObjectId", "ipHash": "string", "deviceKeyHash": "string", "expiresAt": "TTL date" },
+  "auditEvents": { "userId": "ObjectId|null", "type": "string", "metadata": "object", "createdAt": "date" }
+}

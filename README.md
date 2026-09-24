@@ -1,67 +1,77 @@
 # DemoSecurity
 
-Open-source, platform-agnostic security foundation for web and desktop products. DemoSecurity helps teams protect authentication, onboarding, usage limits, payments, administration, and local AI clients without locking the security layer to one frontend or deployment platform.
+Open-source, platform-agnostic security and account-protection foundation for web and desktop products. It is designed for the CyberFallen-style flow: real Google/GitHub authentication, one canonical user account, onboarding persistence, admin visibility, plan enforcement, payment webhooks, anti-abuse signals, and a secure desktop-to-backend prompt gateway.
 
-> **Status:** production-oriented foundation / MVP. OAuth providers, billing webhooks, device-risk signals, admin controls, and local desktop transport are defined as extension points. Never commit credentials or treat client-supplied device data as proof of identity.
+> **Status:** extensible MVP foundation. Provider adapters, billing adapters, risk scoring, admin APIs, and desktop clients must be completed and reviewed before production launch.
 
-## Why NestJS + TypeScript?
+## Stack decision
 
-The backend uses **NestJS on Node.js with TypeScript**. NestJS is a better fit than an unstructured Express application for this project because it provides modules, dependency injection, guards, validation, testing conventions, and a clean path to split services later. The API is transport-agnostic: a React/MERN web app, Electron/Tauri desktop app, CLI, or another language can integrate through REST, OAuth, and WebSocket protocols.
+- **NestJS + TypeScript:** modular REST/WebSocket backend, guards, validation, dependency injection, testing, and a clean path to microservices.
+- **MongoDB:** recommended for MERN teams and flexible onboarding/audit documents.
+- **SQLite:** recommended for local desktop mode, offline-first development, and encrypted local chat metadata.
+- **PostgreSQL:** supported for teams that need relational constraints, reporting, and strong transactional billing/admin data.
 
-MongoDB is a natural default for a MERN integration, but this repository keeps persistence behind interfaces so PostgreSQL or another database can be adopted. The included schema uses Prisma/PostgreSQL for strong constraints and auditability; swap the adapter if MongoDB is required.
+The API uses a **storage adapter boundary**. Set `DB_DRIVER=mongodb`, `DB_DRIVER=sqlite`, or `DB_DRIVER=postgres` per deployment. Do not run one production dataset against multiple drivers at the same time; choose one source of truth and migrate deliberately. Local desktop chat data is separate from the server account database.
 
 ## Repository layout
 
 ```text
-apps/api/              NestJS security API
-packages/contracts/    language-neutral API contracts and event names
-docs/                  architecture, threat model, privacy and integration guides
-infra/                 local development services
+apps/api/              NestJS security API and storage boundary
+apps/api/prisma/       PostgreSQL and SQLite schema/migration sources
+apps/api/src/database/ Runtime database configuration and contracts
+packages/contracts/    Language-neutral API/event contracts
+docs/                  Architecture, security, privacy, database and integration guides
+infra/                 PostgreSQL, MongoDB and local development services
 ```
 
-## Core capabilities
+## Capabilities mapped to the product request
 
-- Google and GitHub OAuth configuration without hard-coded secrets.
-- One canonical user account with provider identities linked to it.
-- Onboarding and admin-visible audit events.
-- Conservative device/risk signals (hashed IP, user-agent, country) with retention controls.
-- Account states: active, restricted, temporarily blocked, permanently blocked.
-- Plan limits and server-side usage enforcement.
-- Payment-provider webhook boundary with idempotency guidance.
-- Desktop flow: local brain -> authenticated WebSocket -> backend -> LLM provider.
-- Local chat storage guidance; secrets and model code must not be shipped as plaintext.
-- Health endpoint, validation, rate limiting, secure headers, and structured error handling.
+- Real Google and GitHub OAuth extension points; secrets stay in environment variables.
+- Provider identities link to one canonical account; email-only auto-linking is disabled by design.
+- Onboarding, subscriptions, usage counters, risk signals and audit events persist server-side.
+- Admin-ready data model for users, onboarding, payments, announcements and account actions.
+- Account states: `ACTIVE`, `RESTRICTED`, `TEMPORARY_BLOCK`, `PERMANENT_BLOCK`.
+- Server-side plan limits and usage enforcement; clients cannot unlock paid features.
+- Hosted checkout in the default browser, signed webhook confirmation, and desktop deep-link return.
+- Desktop local chat storage guidance with OS keychain encryption; local clients are untrusted.
+- Prompt path: Desktop app -> local brain -> authenticated WebSocket -> API -> LLM worker.
+- Risk signals are hashed, expiring and privacy-controlled. Device similarity is never the only block reason.
 
 ## Quick start
 
 ```bash
 cp apps/api/.env.example apps/api/.env
 npm install
-npm run prisma:generate
-npm run prisma:migrate
+# Select one: mongodb, sqlite, or postgres
+npm run db:generate
+npm run db:migrate
 npm run dev
 ```
 
-The API starts on `http://localhost:3000`. The health endpoint is `GET /health`.
+The API starts on `http://localhost:3000`; health check: `GET /health`.
 
-## Required production work
+### Database selection
 
-1. Create Google/GitHub OAuth apps and set callback URLs from `OAUTH_*_CALLBACK_URL`.
-2. Configure a managed database, Redis-backed rate limiting, HTTPS, and a real payment provider.
-3. Implement provider token exchange in an isolated auth adapter; never accept an email from the client as proof.
-4. Verify payment webhook signatures and make webhook handling idempotent.
-5. Add a real admin identity/role system, key rotation, backups, monitoring, and incident response.
-6. Obtain consent and publish a privacy/retention policy before collecting risk signals.
+```dotenv
+DB_DRIVER=mongodb   # mongodb | sqlite | postgres
+```
 
-See [`docs/architecture.md`](docs/architecture.md), [`docs/security.md`](docs/security.md), and [`docs/integration.md`](docs/integration.md).
+- MongoDB: `MONGODB_URI=mongodb://localhost:27017/demosecurity`
+- SQLite: `SQLITE_DATABASE_URL=file:./data/demosecurity.db`
+- PostgreSQL: `DATABASE_URL=postgresql://demosecurity:demosecurity@localhost:5432/demosecurity`
 
-## Security and privacy boundaries
+Use `infra/docker-compose.yml` for MongoDB and PostgreSQL. SQLite needs no service. For a desktop build, use an application-data directory, not the repository directory, and encrypt sensitive local data with an OS keychain-managed key.
 
-- A website cannot reliably read a user's Wi-Fi/router IP or hardware IP. The server can observe the network source IP, and even that may be a proxy/VPN address.
-- Device fingerprinting is probabilistic, can be spoofed, and must not be used as the sole reason to deny an account. Use it as one risk signal with an appeal path.
-- Do not reveal another user's email, even partially, in a popup. Show a generic “existing account detected” message.
-- Never store OAuth access tokens unless a feature explicitly needs them; encrypt them and define short retention.
-- Do not put API keys, payment secrets, or model secrets in a desktop client. Assume the client can be inspected.
+## Production checklist
+
+1. Implement OAuth authorization-code + state/nonce/PKCE validation and exact callback allowlists.
+2. Add session/JWT rotation, CSRF protection for cookies, admin RBAC, pagination, and audit logging.
+3. Add Redis rate limits/queues and a risk service; never rely on browser-provided “device IP” or fingerprint as proof.
+4. Verify payment webhook signatures, deduplicate events, reconcile subscriptions, and update plan limits transactionally.
+5. Add privacy notice, consent, retention/deletion controls, appeals, monitoring, backups, key rotation and incident response.
+6. Sign desktop installers for Windows/macOS/Linux. Never ship provider, payment, admin, or LLM secrets in the client.
+
+See [`docs/database.md`](docs/database.md), [`docs/architecture.md`](docs/architecture.md), [`docs/security.md`](docs/security.md), and [`docs/integration.md`](docs/integration.md).
 
 ## License
 

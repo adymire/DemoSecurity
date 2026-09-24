@@ -1,0 +1,40 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("SQLITE_DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/sqlite"
+}
+
+// Keep this schema structurally aligned with schema.postgres.prisma.
+// Run: npm run db:generate:sqlite
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  displayName String?
+  avatarUrl String?
+  status String @default("ACTIVE")
+  blockedUntil DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Identity {
+  id String @id @default(cuid())
+  provider String
+  providerUserId String
+  userId String
+  createdAt DateTime @default(now())
+  @@unique([provider, providerUserId])
+}
+
+model AuditEvent {
+  id String @id @default(cuid())
+  userId String?
+  type String
+  metadata Json
+  createdAt DateTime @default(now())
+  @@index([type, createdAt])
+}

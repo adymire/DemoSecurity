@@ -1,11 +1,18 @@
 services:
   postgres:
     image: postgres:16-alpine
+    profiles: [postgres]
     environment:
       POSTGRES_USER: demosecurity
       POSTGRES_PASSWORD: demosecurity
       POSTGRES_DB: demosecurity
     ports: ["5432:5432"]
     volumes: [demosecurity_pg:/var/lib/postgresql/data]
+  mongodb:
+    image: mongo:8
+    profiles: [mongodb]
+    ports: ["27017:27017"]
+    volumes: [demosecurity_mongo:/data/db]
 volumes:
   demosecurity_pg:
+  demosecurity_mongo:
