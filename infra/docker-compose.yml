@@ -1,0 +1,11 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: demosecurity
+      POSTGRES_PASSWORD: demosecurity
+      POSTGRES_DB: demosecurity
+    ports: ["5432:5432"]
+    volumes: [demosecurity_pg:/var/lib/postgresql/data]
+volumes:
+  demosecurity_pg:
