@@ -17,9 +17,16 @@ export class DatabaseConfig implements OnModuleDestroy {
 
   get uri(): string {
     if (this.driver === 'mongodb') return this.config.getOrThrow<string>('MONGODB_URI');
-    if (this.driver === 'sqlite') return this.config.get<string>('SQLITE_DATABASE_URL', 'file:./data/demosecurity.db');
+    if (this.driver === 'sqlite')
+      return this.config.get<string>('SQLITE_DATABASE_URL', 'file:./data/demosecurity.db');
     return this.config.getOrThrow<string>('DATABASE_URL');
   }
 
-  onModuleDestroy() { /* adapter-owned clients close in their own lifecycle */ }
+  get redisUrl(): string | undefined {
+    return this.config.get<string>('REDIS_URL') || undefined;
+  }
+
+  onModuleDestroy() {
+    /* adapter-owned clients close in their own lifecycle */
+  }
 }

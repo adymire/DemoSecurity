@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/postgres"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountStatus {
+  ACTIVE
+  RESTRICTED
+  TEMPORARY_BLOCK
+  PERMANENT_BLOCK
+}
+
+enum IdentityProvider {
+  GOOGLE
+  GITHUB
+}
+
+enum AuditType {
+  ACCOUNT_CREATED
+  PROVIDER_LINKED
+  ONBOARDING_UPDATED
+  LOGIN_RISK
+  PAYMENT_UPDATED
+  ADMIN_ACTION
+  RESTRICTION_APPLIED
+  RESTRICTION_REMOVED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  displayName  String?
+  avatarUrl    String?
+  status       AccountStatus @default(ACTIVE)
+  blockedUntil DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  identities    Identity[]
+  riskSignals   RiskSignal[]
+  onboarding    Onboarding?
+  subscription  Subscription?
+  usage         UsageCounter?
+  installations Installation[]
+  auditEvents   AuditEvent[]
+}
+
+model Identity {
+  id             String           @id @default(cuid())
+  provider       IdentityProvider
+  providerUserId String
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+// One installation = one app install on one device (desktop/mobile/web instance).
+// Device reuse is a *signal*, never proof of fraud (see docs/security.md).
+model Installation {
+  id               String    @id @default(cuid())
+  userId           String?
+  user             User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  installationId   String    @unique
+  platform         String    @default("web")
+  appId            String    @default("demosecurity")
+  appVersion       String?
+  deviceRiskIdHash String?
+  firstSeenAt      DateTime  @default(now())
+  lastSeenAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([deviceRiskIdHash])
+}
+
+model Onboarding {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  completed Boolean  @default(false)
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt
+}
+
+model RiskSignal {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installation  String?
+  ipHash        String?
+  userAgentHash String?
+  countryCode   String?
+  deviceKeyHash String?
+  reasonCode    String?
+  score         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime?
+
+  @@index([userId, createdAt])
+  @@index([ipHash])
+  @@index([deviceKeyHash])
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId               String    @default("free")
+  providerCustomerId   String?
+  providerSubscriptionId String?
+  status               String    @default("active")
+  currentPeriodEnd     DateTime?
+  updatedAt            DateTime  @updatedAt
+}
+
+model UsageCounter {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodStart DateTime @default(now())
+  prompts     Int      @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditEvent {
+  id        String    @id @default(cuid())
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type      AuditType
+  metadata  Json      @default("{}")
+  createdAt DateTime  @default(now())
+
+  @@index([type, createdAt])
+  @@index([userId])
+}

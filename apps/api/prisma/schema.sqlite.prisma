@@ -8,33 +8,102 @@ generator client {
   output   = "../generated/sqlite"
 }
 
-// Keep this schema structurally aligned with schema.postgres.prisma.
-// Run: npm run db:generate:sqlite
+// Keep structurally aligned with schema.postgres.prisma.
+// SQLite has no native enums — statuses/providers/types are plain strings.
+// Run: npm run db:generate:sqlite / npm run db:migrate:sqlite
+
 model User {
-  id String @id @default(cuid())
-  email String @unique
-  displayName String?
-  avatarUrl String?
-  status String @default("ACTIVE")
+  id           String   @id @default(cuid())
+  email        String   @unique
+  displayName  String?
+  avatarUrl    String?
+  status       String   @default("ACTIVE")
   blockedUntil DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Identity {
+  id             String   @id @default(cuid())
+  provider       String
+  providerUserId String
+  userId         String
+  createdAt      DateTime @default(now())
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+model Installation {
+  id               String   @id @default(cuid())
+  userId           String?
+  installationId   String   @unique
+  platform         String   @default("web")
+  appId            String   @default("demosecurity")
+  appVersion       String?
+  deviceRiskIdHash String?
+  firstSeenAt      DateTime @default(now())
+  lastSeenAt       DateTime @updatedAt
+}
+
+model Onboarding {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  completed Boolean  @default(false)
+  data      String   @default("{}")
+  updatedAt DateTime @updatedAt
+}
+
+model RiskSignal {
+  id            String   @id @default(cuid())
+  userId        String
+  installation  String?
+  ipHash        String?
+  userAgentHash String?
+  countryCode   String?
+  deviceKeyHash String?
+  reasonCode    String?
+  score         Int      @default(0)
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime?
+
+  @@index([userId, createdAt])
+}
+
+model Subscription {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  planId                 String   @default("free")
+  providerCustomerId     String?
+  providerSubscriptionId String?
+  status                 String   @default("active")
+  currentPeriodEnd       DateTime?
+  updatedAt              DateTime @updatedAt
+}
+
+model UsageCounter {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  periodStart DateTime @default(now())
+  prompts     Int      @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Identity {
-  id String @id @default(cuid())
-  provider String
-  providerUserId String
-  userId String
-  createdAt DateTime @default(now())
-  @@unique([provider, providerUserId])
-}
-
 model AuditEvent {
-  id String @id @default(cuid())
-  userId String?
-  type String
-  metadata Json
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String
+  metadata  String   @default("{}")
   createdAt DateTime @default(now())
+
   @@index([type, createdAt])
 }

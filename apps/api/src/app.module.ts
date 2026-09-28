@@ -1,18 +1,32 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import * as Joi from 'joi';
+import { envValidationSchema } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { HealthController } from './health.controller';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
+import { RiskModule } from './risk/risk.module';
+import { PolicyModule } from './policy/policy.module';
+import { BillingModule } from './billing/billing.module';
+import { AdminModule } from './admin/admin.module';
+import { PromptsModule } from './prompts/prompts.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, validationSchema: Joi.object({
-    NODE_ENV: Joi.string().default('development'), PORT: Joi.number().default(3000),
-    DB_DRIVER: Joi.string().valid('mongodb', 'sqlite', 'postgres').default('mongodb'),
-    MONGODB_URI: Joi.when('DB_DRIVER', { is: 'mongodb', then: Joi.string().required(), otherwise: Joi.string().optional() }),
-    DATABASE_URL: Joi.when('DB_DRIVER', { is: 'postgres', then: Joi.string().required(), otherwise: Joi.string().optional() }),
-    SQLITE_DATABASE_URL: Joi.string().default('file:./data/demosecurity.db'),
-    SESSION_SECRET: Joi.string().min(32).required(), RISK_SIGNAL_PEPPER: Joi.string().min(32).required()
-  }) }), DatabaseModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, validationSchema: envValidationSchema }),
+    DatabaseModule,
+    AuditModule,
+    AuthModule,
+    UsersModule,
+    OnboardingModule,
+    RiskModule,
+    PolicyModule,
+    BillingModule,
+    AdminModule,
+    PromptsModule,
+  ],
   controllers: [HealthController],
 })
 export class AppModule {}

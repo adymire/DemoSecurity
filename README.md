@@ -16,12 +16,25 @@ The API uses a **storage adapter boundary**. Set `DB_DRIVER=mongodb`, `DB_DRIVER
 ## Repository layout
 
 ```text
-apps/api/              NestJS security API and storage boundary
-apps/api/prisma/       PostgreSQL and SQLite schema/migration sources
-apps/api/src/database/ Runtime database configuration and contracts
-packages/contracts/    Language-neutral API/event contracts
+apps/api/src/
+  main.ts / app.module.ts / health.controller.ts
+  config/env.validation.ts     Joi env boundary (DB_DRIVER, secrets, OAuth, billing)
+  common/guards|decorators|utils  JWT guard, Admin guard, CurrentUser, peppered hashing
+  database/                    DatabaseConfig + repositories contract + InMemoryStore (MVP)
+  auth/                        Google/GitHub OAuth extension points, canonical linking, JWT session
+  users/                       Self profile (masked email, plan, usage)
+  onboarding/                  Authenticated PUT /onboarding, persisted + audited
+  risk/                        Weighted multi-signal engine (RISK_ENGINE.md), no single-signal block
+  policy/                      Server-side plan limits + usage + account-status checks
+  billing/                     Hosted checkout + signed idempotent webhook -> subscription
+  admin/                       Paginated users, restrictions, announcements, audit (RBAC)
+  prompts/                     WS /prompts gateway: Desktop->brain->WS->API->LLM
+  audit/                       AuditService (append-only log)
+apps/api/prisma/       schema.postgres.prisma + schema.sqlite.prisma (aligned domain)
+apps/api/              Dockerfile, nest-cli.json, tsconfig, .env.example
+packages/contracts/    Language-neutral TS contracts mirroring docs API.md/DATA_MODEL.md
 docs/                  Architecture, security, privacy, database and integration guides
-infra/                 PostgreSQL, MongoDB and local development services
+infra/                 docker-compose.yml (postgres/mongodb/redis/api) + README (docker guide)
 ```
 
 ## Capabilities mapped to the product request

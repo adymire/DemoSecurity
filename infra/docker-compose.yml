@@ -2,17 +2,79 @@ services:
   postgres:
     image: postgres:16-alpine
     profiles: [postgres]
+    restart: unless-stopped
     environment:
       POSTGRES_USER: demosecurity
       POSTGRES_PASSWORD: demosecurity
       POSTGRES_DB: demosecurity
     ports: ["5432:5432"]
     volumes: [demosecurity_pg:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demosecurity -d demosecurity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [demosecurity_net]
+
   mongodb:
     image: mongo:8
     profiles: [mongodb]
+    restart: unless-stopped
     ports: ["27017:27017"]
     volumes: [demosecurity_mongo:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [demosecurity_net]
+
+  redis:
+    image: redis:7-alpine
+    profiles: [redis]
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["6379:6379"]
+    volumes: [demosecurity_redis:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [demosecurity_net]
+
+  # Optional: run the NestJS API itself in Docker.
+  # Needs apps/api/.env (see apps/api/.env.example). Build with --profile api.
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    profiles: [api]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file: [../apps/api/.env]
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports: ["3000:3000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [demosecurity_net]
+
 volumes:
   demosecurity_pg:
   demosecurity_mongo:
+  demosecurity_redis:
+
+networks:
+  demosecurity_net:
+    driver: bridge
